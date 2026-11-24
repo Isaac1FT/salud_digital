@@ -1,0 +1,68 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function esPropietario(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function citaValida() {
+      return request.resource.data.especialidad is string
+        && request.resource.data.especialidad.size() > 0
+        && request.resource.data.especialidad.size() <= 80
+        && request.resource.data.fechaHora is timestamp
+        && request.resource.data.estado in ['programada', 'completada'];
+    }
+
+    function medicamentoValido() {
+      return request.resource.data.nombre is string
+        && request.resource.data.nombre.size() > 0
+        && request.resource.data.nombre.size() <= 80
+        && request.resource.data.dosis is string
+        && request.resource.data.dosis.size() > 0
+        && request.resource.data.dosis.size() <= 40
+        && request.resource.data.proximaToma is timestamp
+        && request.resource.data.frecuenciaHoras is int
+        && request.resource.data.frecuenciaHoras in [8, 12, 24]
+        && request.resource.data.activo is bool;
+    }
+
+    match /usuarios/{uid} {
+      // Cada persona solo accede a su propio documento.
+      allow read, write: if esPropietario(uid);
+
+      match /citas/{citaId} {
+        allow read: if esPropietario(uid);
+        allow create: if esPropietario(uid) && citaValida();
+        allow update: if esPropietario(uid) && citaValida()
+          && request.resource.data.creadoEn == resource.data.creadoEn;
+        allow delete: if esPropietario(uid);
+      }
+
+      match /medicamentos/{medicamentoId} {
+        allow read: if esPropietario(uid);
+        allow create: if esPropietario(uid) && medicamentoValido();
+        allow update: if esPropietario(uid) && medicamentoValido()
+          && request.resource.data.creadoEn == resource.data.creadoEn;
+        allow delete: if esPropietario(uid);
+      }
+
+      match /tomas/{tomaId} {
+        allow read: if esPropietario(uid);
+        allow create: if esPropietario(uid)
+          && request.resource.data.medicamentoId is string
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.tomado is bool
+          && exists(
+            /databases/$(database)/documents/usuarios/$(uid)/medicamentos/$(request.resource.data.medicamentoId)
+          );
+        allow update: if esPropietario(uid)
+          && request.resource.data.medicamentoId == resource.data.medicamentoId
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.tomado is bool;
+        allow delete: if esPropietario(uid);
+      }
+    }
+  }
+}
