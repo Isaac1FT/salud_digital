@@ -92,6 +92,37 @@ void main() {
     });
   });
 
+  test('el tablero elige un medicamento sin toma registrada hoy', () {
+    final ahora = DateTime(2026, 11, 21, 10);
+    final resumen = ResumenTablero.calcular(
+      citas: const <Cita>[],
+      medicamentos: <Medicamento>[
+        Medicamento(
+          id: 'primero',
+          nombre: 'Enalapril',
+          dosis: '10 mg',
+          proximaToma: ahora.subtract(const Duration(hours: 2)),
+        ),
+        Medicamento(
+          id: 'segundo',
+          nombre: 'Metformina',
+          dosis: '850 mg',
+          proximaToma: ahora.add(const Duration(hours: 2)),
+        ),
+      ],
+      tomas: <TomaMedicamento>[
+        TomaMedicamento(
+          id: 'toma-primero',
+          medicamentoId: 'primero',
+          fecha: ahora,
+        ),
+      ],
+      ahora: ahora,
+    );
+
+    expect(resumen.proximoMedicamento?.id, 'segundo');
+  });
+
   group('DTO', () {
     test('la cita se convierte a un mapa con Timestamp y estado', () {
       final cita = Cita(

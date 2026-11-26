@@ -26,11 +26,9 @@ class ResumenAdherencia {
 
   final List<AdherenciaDia> dias;
 
-  int get esperadas =>
-      dias.fold(0, (total, dia) => total + dia.esperadas);
+  int get esperadas => dias.fold(0, (total, dia) => total + dia.esperadas);
 
-  int get registradas =>
-      dias.fold(0, (total, dia) => total + dia.registradas);
+  int get registradas => dias.fold(0, (total, dia) => total + dia.registradas);
 
   double get porcentaje {
     if (esperadas == 0) return 0;
@@ -72,11 +70,25 @@ class ResumenTablero {
     final activos = medicamentos.where((m) => m.activo).toList()
       ..sort((a, b) => a.proximaToma.compareTo(b.proximaToma));
 
-    final proximaCita = citas
-        .where((c) => c.estado == EstadoCita.programada)
-        .where((c) => !c.fechaHora.isBefore(hoy))
-        .toList()
-      ..sort((a, b) => a.fechaHora.compareTo(b.fechaHora));
+    // Una toma registrada hoy cubre la dosis diaria de ese medicamento.
+    final registradosHoy = tomas
+        .where((toma) => toma.tomado)
+        .where((toma) => !toma.fecha.isBefore(inicioHoy))
+        .where(
+          (toma) => toma.fecha.isBefore(inicioHoy.add(const Duration(days: 1))),
+        )
+        .map((toma) => toma.medicamentoId)
+        .toSet();
+    final pendientes = activos.where(
+      (medicamento) => !registradosHoy.contains(medicamento.id),
+    );
+
+    final proximaCita =
+        citas
+            .where((c) => c.estado == EstadoCita.programada)
+            .where((c) => !c.fechaHora.isBefore(hoy))
+            .toList()
+          ..sort((a, b) => a.fechaHora.compareTo(b.fechaHora));
 
     final idsActivos = activos.map((m) => m.id).toSet();
     final dias = <AdherenciaDia>[];
@@ -101,7 +113,7 @@ class ResumenTablero {
 
     return ResumenTablero(
       proximaCita: proximaCita.isEmpty ? null : proximaCita.first,
-      proximoMedicamento: activos.isEmpty ? null : activos.first,
+      proximoMedicamento: pendientes.isEmpty ? null : pendientes.first,
       adherencia: ResumenAdherencia(List<AdherenciaDia>.unmodifiable(dias)),
       medicamentosActivos: activos.length,
     );
